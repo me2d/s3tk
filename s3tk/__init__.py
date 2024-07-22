@@ -15,7 +15,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from clint.textui import colored, puts, indent
 
-__version__ = '0.4.0'
+__version__ = '0.4.0-me2d'
 
 canned_acls = [
     {
@@ -181,7 +181,7 @@ def determine_mode(acl):
     return next((ca['acl'] for ca in canned_acls if ca['grants'] == non_owner_grants), 'custom')
 
 
-def scan_object(bucket_name, key):
+def scan_object(bucket_name, key, hide_private):
     obj = s3().Object(bucket_name, key)
     str_key = unicode_key(key)
 
@@ -189,7 +189,8 @@ def scan_object(bucket_name, key):
         mode = determine_mode(obj.Acl())
 
         if mode == 'private':
-            puts(str_key + ' ' + colored.green(mode))
+            if not hide_private:
+                puts(str_key + ' ' + colored.green(mode))
         else:
             puts(str_key + ' ' + colored.yellow(mode))
 
@@ -547,8 +548,9 @@ def encrypt(bucket, only=None, _except=None, dry_run=False, kms_key_id=None, cus
 @click.argument('bucket')
 @click.option('--only', help='Only certain objects')
 @click.option('--except', '_except', help='Except certain objects')
-def scan_object_acl(bucket, only=None, _except=None):
-    summarize(parallelize(bucket, only, _except, scan_object))
+@click.option('--hide-private', 'hide_private', is_flag=True, help='Hide private objects from the output')
+def scan_object_acl(bucket, only=None, _except=None, hide_private=None):
+    summarize(parallelize(bucket, only, _except, scan_object, (hide_private,)))
 
 
 @cli.command(name='reset-object-acl')
