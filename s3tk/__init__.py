@@ -87,7 +87,10 @@ def perform(check):
     return check
 
 
-def fetch_buckets(buckets):
+def fetch_buckets(buckets, all_regions=True):
+    return [ b for b in fetch_buckets_internal(buckets) if all_regions or b.meta.client.get_bucket_location(Bucket=b.name).get('LocationConstraint') in [ boto3.Session().region_name ] ]
+
+def fetch_buckets_internal(buckets):
     if buckets:
         if any('*' in b for b in buckets):
             return [b for b in s3().buckets.all() if any(fnmatch.fnmatch(b.name, bn) for bn in buckets)]
@@ -436,11 +439,12 @@ def cli():
 @click.option('--default-encryption', is_flag=True)  # no op, can't hide from help until click 7 released
 @click.option('--object-level-logging', is_flag=True)
 @click.option('--sns-topic', help='Send SNS notification for failures')
-def scan(buckets, log_bucket=None, log_prefix=None, skip_logging=False, skip_versioning=False, skip_default_encryption=False, default_encryption=True, object_level_logging=False, sns_topic=None):
+@click.option('--skip-other-regions', is_flag=True, help='Skip other regions')
+def scan(buckets, log_bucket=None, log_prefix=None, skip_logging=False, skip_versioning=False, skip_default_encryption=False, default_encryption=True, object_level_logging=False, sns_topic=None, skip_other_regions=False):
     event_selectors = fetch_event_selectors() if object_level_logging else {}
 
     checks = []
-    for bucket in fetch_buckets(buckets):
+    for bucket in fetch_buckets(buckets, all_regions=not skip_other_regions):
         puts(bucket.name)
 
         checks.append(perform(AclCheck(bucket)))
